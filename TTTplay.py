@@ -6,14 +6,14 @@ import numpy as np
 import os
 import _pickle as pickle
 import time
-from universe.wrappers import BlockingReset  # meh, simulation seems a little lessy buggy using this wrapper
+#from universe.wrappers import BlockingReset  # meh, simulation seems a little lessy buggy using this wrapper
 
 os.environ["OPENAI_REMOTE_VERBOSE"] = "0" # get rid of the annoying messages until we need htem
 H = 200 #hidden layer neurons
 backprop_batch_size = 20 # number of episodes before back prop
 rms_batch_size = 200 # number of episodes before applying gradients with rms optimizer
 save_every = 200 # save pickle file every 20 episodes
-learning_rate = 1e-4
+learning_rate = 1e-3
 gamma = 0.99 #discount factor for reward
 decay_rate = 0.99 #decay factor for RMSProp leaky sum of grad^2
 savefile = 'saveTTT.p'
@@ -21,7 +21,7 @@ resume = True # resume from previous checkpoint?
 render = True
 
 #model initialization
-D = 18 #input dimension
+D = 9 #input dimension
 O = 9 #number of output neurons
 
 if resume:
@@ -29,8 +29,10 @@ if resume:
   model = pickle.load(open(savefile, 'rb'))
 else:
   model = {}
-  model['W1'] = np.random.randn(H,D)/np.sqrt(D / 2)  #xavier initialization, though not sure why Andre left out the '/ 2' part in his Pong example...
-  model['W2'] = np.random.randn(O,H)/np.sqrt(H / 2)
+  model['W1'] = np.random.randn(H,D)/np.sqrt(D)  #xavier initialization, though not sure why Andre left out the '/ 2' part in his Pong example...
+  model['W2'] = np.random.randn(O,H)/np.sqrt(H)
+#  model['W1'] = np.random.randn(H,D)/np.sqrt(D / 2)  #xavier initialization, though not sure why Andre left out the '/ 2' part in his Pong example...
+#  model['W2'] = np.random.randn(O,H)/np.sqrt(H / 2)
 
 grad_buffer = { k : np.zeros_like(v) for k,v in model.items() } # update buffers that add up gradients over a batch
 rmsprop_cache = { k : np.zeros_like(v) for k,v in model.items() } # rmsprop memory
@@ -49,27 +51,38 @@ def policy_forward(x):
     return p, h # return probability of taking action 2, and hidden state
 
 def prepro(I):
-  smallview = np.zeros (18);
-  smallview[0] = 0 if I['vision'][141][43][0] == 255 else 1
-  smallview[1] = 0 if I['vision'][159][43][0] == 255 else 1
-  smallview[2] = 0 if I['vision'][141][88][0] == 255 else 1
-  smallview[3] = 0 if I['vision'][159][88][0] == 255 else 1
-  smallview[4] = 0 if I['vision'][141][133][0] == 255 else 1
-  smallview[5] = 0 if I['vision'][159][133][0] == 255 else 1
-  smallview[6] = 0 if I['vision'][186][43][0] == 255 else 1
-  smallview[7] = 0 if I['vision'][204][43][0] == 255 else 1
-  smallview[8] = 0 if I['vision'][186][88][0] == 255 else 1
-  smallview[9] = 0 if I['vision'][204][88][0] == 255 else 1
-  smallview[10] = 0 if I['vision'][186][133][0] == 255 else 1
-  smallview[11] = 0 if I['vision'][204][133][0] == 255 else 1
-  smallview[12] = 0 if I['vision'][231][43][0] == 255 else 1
-  smallview[13] = 0 if I['vision'][249][43][0] == 255 else 1
-  smallview[14] = 0 if I['vision'][231][88][0] == 255 else 1
-  smallview[15] = 0 if I['vision'][249][88][0] == 255 else 1
-  smallview[16] = 0 if I['vision'][231][133][0] == 255 else 1
-  smallview[17] = 0 if I['vision'][249][133][0] == 255 else 1
+  smallview = np.zeros (9);
 
-#  print ("Seeing:\nO:%s X:%s | O:%s X:%s | O:%s X:%s\nO:%s X:%s | O:%s X:%s | O:%s X:%s\nO:%s X:%s | O:%s X:%s | O:%s X:%s\n\n" % (tuple (smallview)))
+  # ugly, clean up eventually
+  smallview[0] = 0 if I['vision'][141][43][0] == 255 else 1
+  if (smallview[0] == 0):
+     smallview[0] = 0 if I['vision'][159][43][0] == 255 else -1
+  smallview[1] = 0 if I['vision'][141][88][0] == 255 else 1
+  if (smallview[1] == 0):
+     smallview[1] = 0 if I['vision'][159][88][0] == 255 else -1
+  smallview[2] = 0 if I['vision'][141][133][0] == 255 else 1
+  if (smallview[2] == 0):
+     smallview[2] = 0 if I['vision'][159][133][0] == 255 else -1
+  smallview[3] = 0 if I['vision'][186][43][0] == 255 else 1
+  if (smallview[3] == 0):
+     smallview[3] = 0 if I['vision'][204][43][0] == 255 else -1
+  smallview[4] = 0 if I['vision'][186][88][0] == 255 else 1
+  if (smallview[4] == 0):
+     smallview[4] = 0 if I['vision'][204][88][0] == 255 else -1
+  smallview[5] = 0 if I['vision'][186][133][0] == 255 else 1
+  if (smallview[5] == 0):
+     smallview[5] = 0 if I['vision'][204][133][0] == 255 else -1
+  smallview[6] = 0 if I['vision'][231][43][0] == 255 else 1
+  if (smallview[6] == 0):
+     smallview[6] = 0 if I['vision'][249][43][0] == 255 else -1
+  smallview[7] = 0 if I['vision'][231][88][0] == 255 else 1
+  if (smallview[7] == 0):
+     smallview[7] = 0 if I['vision'][249][88][0] == 255 else -1
+  smallview[8] = 0 if I['vision'][231][133][0] == 255 else 1
+  if (smallview[8] == 0):
+     smallview[8] = 0 if I['vision'][249][133][0] == 255 else -1
+
+  print ("Seeing:\n%s | %s | %s\n%s | %s | %s\n%s | %s | %s\n\n" % (tuple (smallview)))
   return smallview
 
 # 's' is the array of softmax proabilities.  Return the index after a random roll
@@ -123,47 +136,125 @@ def policy_backward(eph, epdlogp):
     dW1 = np.dot(dh.T, epx)
     return {'W1':dW1,'W2':dW2.T}
 
-env = BlockingReset (gym.make('wob.mini.TicTacToe-v0'))
-env.configure(remotes=1, fps=120)
+xs,hs,dlogps,drs,lossarray, rollarray = [],[],[],[],[],[]
+batch_xs,batch_hs,batch_dlogps,batch_drs,batch_lossarray,batch_winarray,batch_rollarray  = [],[],[],[],[],[],[] # reset per-backprob batch array memory
+episode_number = 0
+
+#env = BlockingReset (gym.make('wob.mini.TicTacToe-v0'))
+env = gym.make('wob.mini.TicTacToe-v0')
+env.configure(remotes=1)
 observation_n = env.reset()[0] # reset env
 
-xs,hs,dlogps,drs,lossarray = [],[],[],[],[]
-batch_xs,batch_hs,batch_dlogps,batch_drs,batch_lossarray,batch_winarray  = [],[],[],[],[],[] # reset per-backprob batch array memory
-episode_number = 0
+
+# ugly universe work-around to help make sure board resets properly
+while (observation_n == None):
+   time.sleep (0.3)
+   stepoutput = env.step ([[]])
+   observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
+   if (observation_n == None):
+      continue
+   workaround = prepro (observation_n)
+   if (np.sum (np.abs (workaround)) != 0 and np.sum (np.abs (workaround)) != 1.0):
+      print ("Resetting again because observation did not sum to 0 or 1 for some odd reason\n")
+      time.sleep (0.3) # artifical sleep to avoid quick double clicks and blue squares.. smh
+      observation_n = env.reset()[0] # reset env
+
 
 while True:
    if render: env.render()
 
+   print ("Prepro that is about to be used before forward pass")
    fewerPixels = prepro(observation_n)
+   numberOfXOs = np.sum (np.abs (fewerPixels))
 #        fewerPixels = (fewerPixels - np.mean (fewerPixels)) / 256   # mean center and squish
    sm_prob, h = policy_forward(fewerPixels)  # feed forward network, get softmax probability and save off hidden layers for efficiency
-   thisSq, action_n = fauxclick(RollSoftmax(sm_prob))
+   rolled = RollSoftmax(sm_prob) # lets roll the device giving the probabilities in the feed forward pass
 
+   # temp speed hack to force a roll in a non-occupied slot
+   maxrolls = 10 # only allow up to 10 retries, as it gets trained a lot the network will become very confident and could hang if this isn't in
+   while (fewerPixels[rolled] != 0 and maxrolls > 0):
+      rolled = RollSoftmax(sm_prob) # lets roll the device giving the probabilities in the feed forward pass
+      maxrolls -= 1
+
+   print ("going to click on %d" % (rolled))
+   thisSq, action_n = fauxclick(rolled)
+   
    # assume that the action rolled led to winning the game (the reward discounting will invert this if needed later down the road before backprop)
    # and calculate loss (though we don't explicitely use this computation during bck-prop - only the gradient), We should be able to graph this to make sure the loss is falling over time
    y = np.zeros(9)
    y[thisSq] = 1
    loss = np.sum(np.log(sm_prob)*y)*-1; # cross-entropy loss of soft-max
 
-   time.sleep (0.5) # artifical sleep of 1 to avoid quick double clicks and blue squares.. smh
+   time.sleep (0.6) # artifical sleep to avoid quick double clicks and blue squares.. smh
    stepoutput = env.step (action_n)
    observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
-#   if (reward_n != 0):
-#      raise Exception ('test reward')
+   
+
+   # another hack thing to work-around async step + universe bugs
+   if (done_n == True and reward_n == 0):
+      print ("Going down weird workaround AAA")
+      time.sleep (0.6) # artifical sleep to avoid quick double clicks and blue squares.. smh
+      stepoutput = env.step ([[]])
+      observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
+      done_n = True
+
+   # another hack thing to work-around async step + universe bugs
+   if (done_n != True):
+      print ("Going down weird workaround BBB")
+      time.sleep (0.6) # artifical sleep to avoid quick double clicks and blue squares.. smh
+      while True:
+         stepoutput = env.step ([[]])
+         observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
+         if (done_n != True):
+            print ("Printing observation from BBB")
+            tmp = prepro(observation_n)
+            numberOfXOs_v2 = np.sum (np.abs (tmp))
+            if (numberOfXOs_v2 - numberOfXOs == 2):
+               print ('Ending game early because %d - %d is 2' % (numberOfXOs_v2, numberOfXOs))
+               break;
+         else:
+            print ("Ending early because done_n is True in BBB")
+            break;
+
+   # another hack thing to work-around async step + universe bugs
+   if (done_n == True and reward_n == 0):
+      print ("Going down weird workaround CCC")
+      time.sleep (0.6) # artifical sleep to avoid quick double clicks and blue squares.. smh
+      stepoutput = env.step ([])
+      observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
+      done_n = True
+
+# For debugging only
+   print ("Reward of: %f after moving to %d" % (reward_n, rolled))
+   if (done_n == True):
+      print ("Finished individual game with reward of: %f\nAfter step seeing is:\n" % (reward_n))
+      if (observation_n != None):
+         prepro (observation_n) # just for printing/debugging
+
+   # speed hack to speed up training so our player doesn't play more than 5 moves.  this should (hopefully) indirectly discouarge behaviors of clicking on already-occupied squares
+   # should be able to remove this once we confirm it's learning
+   if (len (drs) >= 5 and done_n != True):
+      print ("played too many turns lets end game, speed back")
+      reward_n = -1 
+      done_n = True
+#      raise Exception ("shouldn't ever get here now due to other speed hack to make sure you don't roll in any occupied square")
 
    dlogps.append(y - sm_prob) # gradient of softmax loss (or probability maximization in this case)
    xs.append(fewerPixels)  # observation before the last step (input neurons)
    hs.append(h)  # hidden state of feedforward before last step
    drs.append(reward_n)  # record reward after step
    lossarray.append (loss) # loss of previous step
+   rollarray.append (rolled) # keep track of what square we played (for debugging purposes)
+#   print ("loss is: %s" % (loss))
+
 
    if done_n == True:  # episode finished
        if (reward_n == 0.0):
           failed = True
-          print ("WEIRD SCENARIO2, done but no reward?  unfortunately after manual inspection this doesn't seem to represent a tie but rather a weird simulation thing.. lets ignore this game")
+          print ("VERY WEIRD SCENARIO2, done but no reward?  unfortunately after manual inspection this doesn't seem to represent a tie but rather a weird simulation thing.. lets ignore this game")
        elif (np.std (drs) == 0): # bug-workaround, only calculate if std is not 0 due to Universe telling us we are done when we're not
           failed = True
-          print ("WEIRD SCENARIO, hmm... preventing nan's by workaround:  %s" % (drs))
+          print ("VERY WEIRD SCENARIO, hmm... preventing nan's by workaround:  %s" % (drs))
        else:
           failed = False
           episode_number += 1
@@ -177,8 +268,9 @@ while True:
           batch_dlogps.extend (dlogps)
           batch_drs.extend (drs)
           batch_lossarray.extend (lossarray)
+          batch_rollarray.extend (rollarray)
 
-       xs,hs,dlogps,drs,lossarray = [],[],[],[],[] # reset per-game array memory.  This gets cleared even/especially on the weird scenario errors
+       xs,hs,dlogps,drs,lossarray, rollarray = [],[],[],[],[],[] # reset per-game array memory.  This gets cleared even/especially on the weird scenario errors
        
        # consider backprop_batch_size number of games at a time before doing back prop.  this way there is some diversity in the rewards prior to mean normalization of the discounted rewards
        if failed == False and episode_number % backprop_batch_size == 0:
@@ -196,6 +288,7 @@ while True:
           epdlogp *= discounted_epr  # modulate gradient with advantage
 
           grad = policy_backward(eph, epdlogp)
+#          raise Exception ('test44')
 
           # accumulate grad over batch (gradient ascent versus descent I believe)
           for k in model: grad_buffer[k] += grad[k]
@@ -206,7 +299,7 @@ while True:
           uniq, counts = np.unique (batch_winarray, return_counts=True)
           print (np.asarray((uniq, counts)).T) 
 
-          batch_xs,batch_hs,batch_dlogps,batch_drs,batch_lossarray,batch_winarray  = [],[],[],[],[],[] # reset per-backprob batch array memory
+          batch_xs,batch_hs,batch_dlogps,batch_drs,batch_lossarray,batch_winarray,batch_rollarray  = [],[],[],[],[],[],[] # reset per-backprob batch array memory
 
        if failed == False and episode_number % rms_batch_size == 0:
            for k, v in model.items():
@@ -217,4 +310,18 @@ while True:
 
        if failed == False and episode_number % save_every == 0: pickle.dump(model, open(savefile, 'wb'))
 
+       print ("Resetting board")
        observation_n = env.reset()[0] # reset env
+
+       # ugly universe work-around to help make sure board resets properly
+       while (observation_n == None):
+          time.sleep (.3)
+          stepoutput = env.step ([[]])
+          observation_n, reward_n, done_n = [i[0] for i in stepoutput[0:3]] # ugly but allows assignment on one line (assumes one environment)
+          if (observation_n == None):
+             continue
+          workaround = prepro (observation_n)
+          if (np.sum (np.abs (workaround)) != 0 and np.sum (np.abs (workaround)) != 1.0):
+             print ("Resetting again because observation did not sum to 0 or 1 for some odd reason\n")
+             time.sleep (.3) # artifical sleep to avoid quick double clicks and blue squares.. smh
+             observation_n = env.reset()[0] # reset env
